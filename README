@@ -1,51 +1,95 @@
-NOTE: we have stopped maintaining the x86 version of xv6, and switched
-our efforts to the RISC-V version
-(https://github.com/mit-pdos/xv6-riscv.git)
+# xv6 Priority-Based Scheduler
 
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern x86-based multiprocessor using ANSI C.
+Implementation of a priority-based process scheduler for the xv6 operating system.
 
-ACKNOWLEDGMENTS
+**Course**: Operating Systems Fall 2025  
+**Institution**: NUST-SEECS  
+**Assignment**: Kernel Feature Implementation (Assignment 2)
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+---
 
-xv6 borrows code from the following sources:
-    JOS (asm.h, elf.h, mmu.h, bootasm.S, ide.c, console.c, and others)
-    Plan 9 (entryother.S, mp.h, mp.c, lapic.c)
-    FreeBSD (ioapic.c)
-    NetBSD (console.c)
+## 📋 Overview
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+This project extends the xv6 operating system kernel with a **priority-based scheduling algorithm**. The original xv6 uses a simple round-robin scheduler that treats all processes equally. Our implementation introduces process priorities, allowing higher-priority processes to receive CPU time preferentially.
 
-We are also grateful for the bug reports and patches contributed by Silas
-Boyd-Wickizer, Anton Burtsev, Cody Cutler, Mike CAT, Tej Chajed, eyalz800,
-Nelson Elhage, Saar Ettinger, Alice Ferrazzi, Nathaniel Filardo, Peter
-Froehlich, Yakir Goaron,Shivam Handa, Bryan Henry, Jim Huang, Alexander
-Kapshuk, Anders Kaseorg, kehao95, Wolfgang Keller, Eddie Kohler, Austin
-Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi
-Merimovich, Mark Morrissey, mtasm, Joel Nider, Greg Price, Ayan Shafqat,
-Eldar Sehayek, Yongming Shen, Cam Tenny, tyfkda, Rafael Ubal, Warren
-Toomey, Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang Wei.
+### Key Features
 
-The code in the files that constitute xv6 is
-Copyright 2006-2018 Frans Kaashoek, Robert Morris, and Russ Cox.
+- Static priority scheduling (0-31 range, 0 = highest priority)
+- New system call: `setpriority(int priority)` 
+-  Default priority of 20 for all processes
+-  Priority inheritance during `fork()`
+-  Input validation and error handling
+-  Comprehensive test suite included
 
-ERROR REPORTS
+---
 
-We don't process error reports (see note on top of this file).
+## Implementation Details
 
-BUILDING AND RUNNING XV6
+### Modified Kernel Components
 
-To build xv6 on an x86 ELF machine (like Linux or FreeBSD), run
-"make". On non-x86 or non-ELF machines (like OS X, even on x86), you
-will need to install a cross-compiler gcc suite capable of producing
-x86 ELF binaries (see https://pdos.csail.mit.edu/6.828/).
-Then run "make TOOLPREFIX=i386-jos-elf-". Now install the QEMU PC
-simulator and run "make qemu".
+| File | Changes Made |
+|------|--------------|
+| `proc.h` | Added `int priority` field to `struct proc` |
+| `proc.c` | Modified `scheduler()` to select highest priority process |
+| `proc.c` | Initialized priority in `allocproc()` and `fork()` |
+| `proc.c` | Implemented `setpriority()` function |
+| `syscall.h` | Added `SYS_setpriority` system call number |
+| `syscall.c` | Registered `sys_setpriority` handler |
+| `sysproc.c` | Added `sys_setpriority()` wrapper |
+| `user.h` | Added user-space function prototype |
+| `usys.S` | Added system call stub |
+| `defs.h` | Added function declaration |
+
+### Scheduling Algorithm
+```c
+// Pseudocode for priority scheduler
+for each scheduling round:
+    acquire ptable lock
+    highest_priority_process = NULL
+    
+    for each process in ptable:
+        if process.state == RUNNABLE:
+            if highest_priority_process == NULL OR 
+               process.priority < highest_priority_process.priority:
+                highest_priority_process = process
+    
+    if highest_priority_process found:
+        context_switch_to(highest_priority_process)
+    
+    release ptable lock
+```
+
+**Time Complexity**: O(n) where n = number of processes (NPROC = 64)
+
+### Priority System
+
+- **Range**: 0 (highest) to 31 (lowest)
+- **Default**: 20 (medium priority)
+- **Validation**: System call rejects priorities outside 0-31 range
+- **Inheritance**: Child processes inherit parent's priority at fork time
+- **Modification**: Processes can change their own priority via `setpriority()`
+
+---
+
+##  Setup & Installation
+
+### Prerequisites
+
+- Linux environment (Ubuntu 20.04+ recommended)
+- QEMU emulator: `sudo apt install qemu-system`
+- Build tools: `sudo apt install build-essential git`
+- GCC compiler: `sudo apt install gcc g++`
+
+### Clone and Build
+```bash
+# Clone the repository
+git clone https://github.com/Usman-Javaid1234/Priority_Scheduler_xv6.git
+cd Priority_Scheduler_xv6
+
+# Build xv6 kernel
+make clean
+make
+
+# Run xv6 in QEMU (no graphics)
+make qemu-nox
+```
