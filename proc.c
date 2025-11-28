@@ -88,7 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->priority = 20;  //Default medium priority
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -199,7 +199,7 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
+  np->priority = curproc->priority;  //Child inherits parent's priority
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -323,6 +323,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *highp; // Highest priority process
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -330,12 +331,26 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
+    // Loop over process table looking for highest priority process to run.
     acquire(&ptable.lock);
+    
+    highp = 0;  // Reset highest priority process
+    
+    // Find the highest priority (lowest number) RUNNABLE process
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
+      
+      // If no process selected yet, or this process has higher priority
+      if(highp == 0 || p->priority < highp->priority){
+        highp = p;
+      }
+    }
+    
+    // If we found a runnable process, run it
+    if(highp != 0){
+      p = highp;
+      
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -350,8 +365,8 @@ scheduler(void)
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
+    
     release(&ptable.lock);
-
   }
 }
 
@@ -531,4 +546,20 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+// Set priority of current process
+int
+setpriority(int priority)
+{
+  struct proc *curproc = myproc();
+  
+  // Validate priority range (0-31)
+  if(priority < 0 || priority > 31)
+    return -1;
+  
+  acquire(&ptable.lock);
+  curproc->priority = priority;
+  release(&ptable.lock);
+  
+  return 0;
 }
