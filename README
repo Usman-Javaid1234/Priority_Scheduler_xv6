@@ -93,3 +93,7 @@ make
 # Run xv6 in QEMU (no graphics)
 make qemu-nox
 ```
+To run test programs:
+./prioritytest
+./stresstest
+./edgetest
